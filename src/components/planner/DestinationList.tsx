@@ -3,7 +3,9 @@ import { useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
+  BedDouble,
   Edit2,
+  ExternalLink,
   FileWarning,
   GripVertical,
   MapPin,
@@ -26,6 +28,8 @@ interface DestinationListProps {
 interface TransportDefaults {
   from?: string;
   to?: string;
+  fromDestinationId?: string;
+  toDestinationId?: string;
 }
 
 export const DestinationList = ({ data, setData }: DestinationListProps) => {
@@ -38,20 +42,33 @@ export const DestinationList = ({ data, setData }: DestinationListProps) => {
   const upsertDestination = (destination: Destination) => {
     setData((current) => {
       const exists = current.destinations.some((item) => item.id === destination.id);
-      const previousName = current.destinations.find((item) => item.id === destination.id)?.name;
+      const previous = current.destinations.find((item) => item.id === destination.id);
+      const previousName = previous?.name;
+      const previousNameWasUnique = previousName
+        ? current.destinations.filter((item) => item.name === previousName).length === 1
+        : false;
       return {
         ...current,
         destinations: exists
           ? current.destinations.map((item) => (item.id === destination.id ? destination : item))
           : [...current.destinations, destination],
-        transports:
-          previousName && previousName !== destination.name
-            ? current.transports.map((transport) => ({
+        transports: previous
+          ? current.transports.map((transport) => {
+              const fromMatches =
+                transport.fromDestinationId === destination.id ||
+                (!transport.fromDestinationId && previousNameWasUnique && transport.from === previousName);
+              const toMatches =
+                transport.toDestinationId === destination.id ||
+                (!transport.toDestinationId && previousNameWasUnique && transport.to === previousName);
+              return {
                 ...transport,
-                from: transport.from === previousName ? destination.name : transport.from,
-                to: transport.to === previousName ? destination.name : transport.to,
-              }))
-            : current.transports,
+                from: fromMatches ? destination.name : transport.from,
+                to: toMatches ? destination.name : transport.to,
+                fromDestinationId: fromMatches ? destination.id : transport.fromDestinationId,
+                toDestinationId: toMatches ? destination.id : transport.toDestinationId,
+              };
+            })
+          : current.transports,
       };
     });
     setShowDestinationForm(false);
@@ -59,15 +76,39 @@ export const DestinationList = ({ data, setData }: DestinationListProps) => {
   };
 
   const deleteDestination = (id: string) => {
-    if (!window.confirm("Deze bestemming verwijderen?")) return;
+    const destination = data.destinations.find((item) => item.id === id);
+    if (!destination) return;
+    const nameIsUnique = data.destinations.filter((item) => item.name === destination.name).length === 1;
+    const relatedTransports = data.transports.filter((transport) =>
+      transport.fromDestinationId === id ||
+      transport.toDestinationId === id ||
+      (nameIsUnique &&
+        ((!transport.fromDestinationId && transport.from === destination.name) ||
+          (!transport.toDestinationId && transport.to === destination.name)))
+    );
+    const suffix = relatedTransports.length
+      ? ` Ook ${relatedTransports.length} gekoppelde verplaatsing(en) worden verwijderd.`
+      : "";
+    if (!window.confirm(`Deze bestemming verwijderen?${suffix}`)) return;
+    const transportIds = new Set(relatedTransports.map((transport) => transport.id));
     setData((current) => ({
       ...current,
-      destinations: current.destinations.filter((destination) => destination.id !== id),
+      destinations: current.destinations.filter((item) => item.id !== id),
+      transports: current.transports.filter((transport) => !transportIds.has(transport.id)),
+      dayPlans: current.dayPlans.map((day) => ({
+        ...day,
+        transportIds: day.transportIds.filter((transportId) => !transportIds.has(transportId)),
+      })),
       expenses: current.expenses.map((expense) =>
         expense.destinationId === id ? { ...expense, destinationId: "" } : expense
       ),
-      documents: current.documents.map((document) =>
-        document.linkedDestinationId === id ? { ...document, linkedDestinationId: "" } : document
+      documents: current.documents.map((document) => ({
+        ...document,
+        linkedDestinationId: document.linkedDestinationId === id ? "" : document.linkedDestinationId,
+        linkedTransportId: transportIds.has(document.linkedTransportId) ? "" : document.linkedTransportId,
+      })),
+      activities: current.activities.map((activity) =>
+        activity.destinationId === id ? { ...activity, destinationId: "" } : activity
       ),
     }));
   };
@@ -85,11 +126,26 @@ export const DestinationList = ({ data, setData }: DestinationListProps) => {
   const upsertTransport = (transport: Transport) => {
     setData((current) => {
       const exists = current.transports.some((item) => item.id === transport.id);
+      const selectedDocumentIds = new Set(transport.documentIds);
+      const transports = (exists
+        ? current.transports.map((item) => (item.id === transport.id ? transport : item))
+        : [...current.transports, transport]
+      ).map((item) =>
+        item.id === transport.id
+          ? item
+          : { ...item, documentIds: item.documentIds.filter((id) => !selectedDocumentIds.has(id)) }
+      );
       return {
         ...current,
-        transports: exists
-          ? current.transports.map((item) => (item.id === transport.id ? transport : item))
-          : [...current.transports, transport],
+        transports,
+        documents: current.documents.map((document) => ({
+          ...document,
+          linkedTransportId: selectedDocumentIds.has(document.id)
+            ? transport.id
+            : document.linkedTransportId === transport.id
+              ? ""
+              : document.linkedTransportId,
+        })),
       };
     });
     setShowTransportForm(false);
@@ -106,6 +162,9 @@ export const DestinationList = ({ data, setData }: DestinationListProps) => {
         ...day,
         transportIds: day.transportIds.filter((transportId) => transportId !== id),
       })),
+      documents: current.documents.map((document) =>
+        document.linkedTransportId === id ? { ...document, linkedTransportId: "" } : document
+      ),
     }));
   };
 
@@ -116,16 +175,25 @@ export const DestinationList = ({ data, setData }: DestinationListProps) => {
   };
 
   const matchingTransportIds = new Set<string>();
+  const transportConnects = (transport: Transport, from: Destination, to: Destination) =>
+    (transport.fromDestinationId === from.id && transport.toDestinationId === to.id) ||
+    (data.destinations.filter((destination) => destination.name === from.name).length === 1 &&
+      data.destinations.filter((destination) => destination.name === to.name).length === 1 &&
+      !transport.fromDestinationId &&
+      !transport.toDestinationId &&
+      transport.from === from.name &&
+      transport.to === to.name);
+
   data.destinations.forEach((destination, index) => {
     const nextDestination = data.destinations[index + 1];
     if (!nextDestination) return;
     data.transports
-      .filter((transport) => transport.from === destination.name && transport.to === nextDestination.name)
+      .filter((transport) => transportConnects(transport, destination, nextDestination))
       .forEach((transport) => matchingTransportIds.add(transport.id));
   });
 
-  const getBetweenTransports = (from: string, to: string) =>
-    data.transports.filter((transport) => transport.from === from && transport.to === to);
+  const getBetweenTransports = (from: Destination, to: Destination) =>
+    data.transports.filter((transport) => transportConnects(transport, from, to));
 
   const renderTransport = (transport: Transport) => (
     <div
@@ -139,7 +207,9 @@ export const DestinationList = ({ data, setData }: DestinationListProps) => {
             {transport.from} naar {transport.to}
           </p>
           <StatusBadge status={transport.status} />
-          {transport.status === "geboekt" && transport.documentIds.length === 0 ? (
+          {["geboekt", "betaald"].includes(transport.status) &&
+          transport.documentIds.length === 0 &&
+          !data.documents.some((document) => document.linkedTransportId === transport.id) ? (
             <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">
               <FileWarning size={13} />
               Boeking heeft nog geen document.
@@ -147,13 +217,19 @@ export const DestinationList = ({ data, setData }: DestinationListProps) => {
           ) : null}
         </div>
         <p className="mt-1 text-sm text-slate-500">
-          {transport.mode}
+          {transport.provider ? `${transport.provider} · ` : ""}{transport.mode}
           {transport.routeDescription ? ` · ${transport.routeDescription}` : ""}
           {transport.departureDate ? ` · ${formatDate(transport.departureDate)}` : ""}
+          {transport.departureTime ? ` om ${transport.departureTime}` : ""}
           {transport.cost ? ` · ${formatMoney(transport.cost, data.trip?.currency)}` : ""}
         </p>
       </div>
       <div className="flex gap-2">
+        {transport.bookingLink ? (
+          <a className="icon-btn" href={transport.bookingLink} rel="noreferrer" target="_blank" title="Boeking openen">
+            <ExternalLink size={16} />
+          </a>
+        ) : null}
         <button
           className="icon-btn"
           type="button"
@@ -218,8 +294,11 @@ export const DestinationList = ({ data, setData }: DestinationListProps) => {
 
       {showTransportForm ? (
         <TransportForm
+          destinations={data.destinations}
           defaultFrom={transportDefaults.from}
           defaultTo={transportDefaults.to}
+          defaultFromDestinationId={transportDefaults.fromDestinationId}
+          defaultToDestinationId={transportDefaults.toDestinationId}
           documents={data.documents}
           initial={editingTransport}
           onCancel={() => {
@@ -244,7 +323,7 @@ export const DestinationList = ({ data, setData }: DestinationListProps) => {
           {data.destinations.map((destination, index) => {
             const nextDestination = data.destinations[index + 1];
             const betweenTransports = nextDestination
-              ? getBetweenTransports(destination.name, nextDestination.name)
+              ? getBetweenTransports(destination, nextDestination)
               : [];
             const linkedAccommodationDoc = data.documents.some(
               (document) => document.linkedDestinationId === destination.id
@@ -287,7 +366,32 @@ export const DestinationList = ({ data, setData }: DestinationListProps) => {
                       {destination.notes ? (
                         <p className="mt-3 text-sm text-slate-500">{destination.notes}</p>
                       ) : null}
-                      {destination.accommodationStatus === "geboekt" && !linkedAccommodationDoc ? (
+                      {destination.accommodationName ? (
+                        <div className="mt-4 flex flex-col gap-3 rounded-xl bg-slate-50 p-4 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                              <BedDouble size={14} /> Verblijf
+                            </p>
+                            <p className="mt-1 font-semibold text-slate-900">{destination.accommodationName}</p>
+                            {destination.accommodationAddress ? (
+                              <p className="mt-0.5 text-sm text-slate-500">{destination.accommodationAddress}</p>
+                            ) : null}
+                            {destination.checkInTime || destination.checkOutTime ? (
+                              <p className="mt-1 text-xs text-slate-500">
+                                {destination.checkInTime ? `Inchecken ${destination.checkInTime}` : ""}
+                                {destination.checkInTime && destination.checkOutTime ? " · " : ""}
+                                {destination.checkOutTime ? `Uitchecken ${destination.checkOutTime}` : ""}
+                              </p>
+                            ) : null}
+                          </div>
+                          {destination.accommodationLink ? (
+                            <a className="btn-secondary shrink-0" href={destination.accommodationLink} rel="noreferrer" target="_blank">
+                              <ExternalLink size={15} /> Open verblijf
+                            </a>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {["geboekt", "betaald"].includes(destination.accommodationStatus) && !linkedAccommodationDoc ? (
                         <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
                           <FileWarning size={16} />
                           Verblijf heeft nog geen document.
@@ -345,7 +449,14 @@ export const DestinationList = ({ data, setData }: DestinationListProps) => {
                       <button
                         className="btn-secondary"
                         type="button"
-                        onClick={() => startTransport({ from: destination.name, to: nextDestination.name })}
+                        onClick={() =>
+                          startTransport({
+                            from: destination.name,
+                            to: nextDestination.name,
+                            fromDestinationId: destination.id,
+                            toDestinationId: nextDestination.id,
+                          })
+                        }
                       >
                         <Plus size={16} />
                         Vervoer tussen deze stops toevoegen

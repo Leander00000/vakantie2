@@ -26,11 +26,19 @@ const createEmptyDestination = (): Destination => ({
   transportStatus: "nog zoeken",
   accommodationLink: "",
   transportLink: "",
+  accommodationName: "",
+  accommodationAddress: "",
+  accommodationReference: "",
+  checkInTime: "",
+  checkOutTime: "",
   notes: "",
 });
 
 export const DestinationForm = ({ initial, onSubmit, onCancel }: DestinationFormProps) => {
-  const [form, setForm] = useState<Destination>(initial ?? createEmptyDestination());
+  const [form, setForm] = useState<Destination>(() => ({
+    ...createEmptyDestination(),
+    ...initial,
+  }));
   const [error, setError] = useState("");
   const nights = calculateNights(form.arrivalDate, form.departureDate);
 
@@ -40,9 +48,16 @@ export const DestinationForm = ({ initial, onSubmit, onCancel }: DestinationForm
       setError("Vul een bestemming in.");
       return;
     }
+    if (form.arrivalDate && form.departureDate && form.departureDate < form.arrivalDate) {
+      setError("De vertrekdatum kan niet vóór de aankomstdatum liggen.");
+      return;
+    }
     onSubmit({
       ...form,
       name: form.name.trim(),
+      accommodationName: form.accommodationName.trim(),
+      accommodationAddress: form.accommodationAddress.trim(),
+      accommodationReference: form.accommodationReference.trim(),
       nights,
     });
   };
@@ -57,6 +72,7 @@ export const DestinationForm = ({ initial, onSubmit, onCancel }: DestinationForm
             value={form.name}
             onChange={(event) => setForm({ ...form, name: event.target.value })}
             placeholder="Zelf invullen"
+            autoFocus
           />
         </label>
 
@@ -87,6 +103,7 @@ export const DestinationForm = ({ initial, onSubmit, onCancel }: DestinationForm
           <input
             className="input mt-1"
             type="date"
+            max={form.departureDate || undefined}
             value={form.arrivalDate}
             onChange={(event) => setForm({ ...form, arrivalDate: event.target.value })}
           />
@@ -97,6 +114,7 @@ export const DestinationForm = ({ initial, onSubmit, onCancel }: DestinationForm
           <input
             className="input mt-1"
             type="date"
+            min={form.arrivalDate || undefined}
             value={form.departureDate}
             onChange={(event) => setForm({ ...form, departureDate: event.target.value })}
           />
@@ -138,6 +156,7 @@ export const DestinationForm = ({ initial, onSubmit, onCancel }: DestinationForm
           <span className="label">Link naar accommodatie</span>
           <input
             className="input mt-1"
+            type="url"
             value={form.accommodationLink}
             onChange={(event) => setForm({ ...form, accommodationLink: event.target.value })}
             placeholder="https://"
@@ -148,11 +167,70 @@ export const DestinationForm = ({ initial, onSubmit, onCancel }: DestinationForm
           <span className="label">Link naar vervoer</span>
           <input
             className="input mt-1"
+            type="url"
             value={form.transportLink}
             onChange={(event) => setForm({ ...form, transportLink: event.target.value })}
             placeholder="https://"
           />
         </label>
+
+        <div className="md:col-span-2 xl:col-span-4 mt-1 border-t border-slate-200 pt-4">
+          <h3 className="text-sm font-semibold text-slate-900">Verblijfsgegevens</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            Optioneel, handig zodra je een accommodatie hebt gekozen of geboekt.
+          </p>
+        </div>
+
+        <label className="md:col-span-2">
+          <span className="label">Naam accommodatie</span>
+          <input
+            className="input mt-1"
+            value={form.accommodationName}
+            onChange={(event) => setForm({ ...form, accommodationName: event.target.value })}
+            placeholder="Hotel, appartement of verblijf"
+          />
+        </label>
+
+        <label className="md:col-span-2">
+          <span className="label">Adres accommodatie</span>
+          <input
+            className="input mt-1"
+            value={form.accommodationAddress}
+            onChange={(event) => setForm({ ...form, accommodationAddress: event.target.value })}
+            placeholder="Straat, plaats of praktische aanwijzing"
+          />
+        </label>
+
+        <label className="md:col-span-2">
+          <span className="label">Boekingsnummer</span>
+          <input
+            className="input mt-1"
+            value={form.accommodationReference}
+            onChange={(event) => setForm({ ...form, accommodationReference: event.target.value })}
+            placeholder="Optionele reserveringscode"
+          />
+        </label>
+
+        <div className="grid gap-4 sm:grid-cols-2 md:col-span-2">
+          <label>
+            <span className="label">Inchecktijd</span>
+            <input
+              className="input mt-1"
+              type="time"
+              value={form.checkInTime}
+              onChange={(event) => setForm({ ...form, checkInTime: event.target.value })}
+            />
+          </label>
+          <label>
+            <span className="label">Uitchecktijd</span>
+            <input
+              className="input mt-1"
+              type="time"
+              value={form.checkOutTime}
+              onChange={(event) => setForm({ ...form, checkOutTime: event.target.value })}
+            />
+          </label>
+        </div>
 
         <label className="md:col-span-2 xl:col-span-4">
           <span className="label">Notities</span>
@@ -164,7 +242,11 @@ export const DestinationForm = ({ initial, onSubmit, onCancel }: DestinationForm
         </label>
       </div>
 
-      {error ? <p className="text-sm font-semibold text-rose-700">{error}</p> : null}
+      {error ? (
+        <p className="text-sm font-semibold text-rose-700" role="alert">
+          {error}
+        </p>
+      ) : null}
 
       <div className="flex flex-wrap justify-end gap-2">
         <button className="btn-secondary" type="button" onClick={onCancel}>

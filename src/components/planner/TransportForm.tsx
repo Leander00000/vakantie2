@@ -3,6 +3,7 @@ import { createId } from "../../data/emptyTrip";
 import {
   transportModes,
   transportStatuses,
+  type Destination,
   type Transport,
   type TransportMode,
   type TransportStatus,
@@ -10,22 +11,36 @@ import {
 } from "../../types";
 
 interface TransportFormProps {
+  destinations: Destination[];
   documents: TravelDocument[];
   initial?: Transport;
   defaultFrom?: string;
   defaultTo?: string;
+  defaultFromDestinationId?: string;
+  defaultToDestinationId?: string;
   onSubmit: (transport: Transport) => void;
   onCancel: () => void;
 }
 
-const createEmptyTransport = (defaultFrom = "", defaultTo = ""): Transport => ({
+const createEmptyTransport = (
+  defaultFrom = "",
+  defaultTo = "",
+  defaultFromDestinationId = "",
+  defaultToDestinationId = ""
+): Transport => ({
   id: createId("transport"),
   from: defaultFrom,
   to: defaultTo,
+  fromDestinationId: defaultFromDestinationId,
+  toDestinationId: defaultToDestinationId,
   mode: "trein",
   routeDescription: "",
   departureDate: "",
   arrivalDate: "",
+  departureTime: "",
+  arrivalTime: "",
+  provider: "",
+  bookingReference: "",
   status: "nog zoeken",
   cost: 0,
   bookingLink: "",
@@ -33,18 +48,26 @@ const createEmptyTransport = (defaultFrom = "", defaultTo = ""): Transport => ({
   notes: "",
 });
 
-const selectedOptions = (select: HTMLSelectElement) =>
-  Array.from(select.selectedOptions).map((option) => option.value);
-
 export const TransportForm = ({
+  destinations,
   documents,
   initial,
   defaultFrom,
   defaultTo,
+  defaultFromDestinationId,
+  defaultToDestinationId,
   onSubmit,
   onCancel,
 }: TransportFormProps) => {
-  const [form, setForm] = useState<Transport>(initial ?? createEmptyTransport(defaultFrom, defaultTo));
+  const [form, setForm] = useState<Transport>(() => ({
+    ...createEmptyTransport(
+      defaultFrom,
+      defaultTo,
+      defaultFromDestinationId,
+      defaultToDestinationId
+    ),
+    ...initial,
+  }));
   const [error, setError] = useState("");
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -53,10 +76,41 @@ export const TransportForm = ({
       setError("Vul een vertrekpunt en aankomstpunt in.");
       return;
     }
+    if (form.departureDate && form.arrivalDate && form.arrivalDate < form.departureDate) {
+      setError("De aankomstdatum kan niet vóór de vertrekdatum liggen.");
+      return;
+    }
+    if (
+      form.departureDate &&
+      form.departureDate === form.arrivalDate &&
+      form.departureTime &&
+      form.arrivalTime &&
+      form.arrivalTime < form.departureTime
+    ) {
+      setError("Op dezelfde dag kan de aankomsttijd niet vóór de vertrektijd liggen.");
+      return;
+    }
+    if (!Number.isFinite(Number(form.cost)) || Number(form.cost) < 0) {
+      setError("Vul een geldig kostenbedrag van 0 of meer in.");
+      return;
+    }
+    const from = form.from.trim();
+    const to = form.to.trim();
+    const resolveDestinationId = (name: string, currentId: string) => {
+      const currentDestination = destinations.find((destination) => destination.id === currentId);
+      if (currentDestination?.name === name) return currentId;
+      const matches = destinations.filter((destination) => destination.name === name);
+      return matches.length === 1 ? matches[0].id : "";
+    };
     onSubmit({
       ...form,
-      from: form.from.trim(),
-      to: form.to.trim(),
+      from,
+      to,
+      fromDestinationId: resolveDestinationId(from, form.fromDestinationId),
+      toDestinationId: resolveDestinationId(to, form.toDestinationId),
+      routeDescription: form.routeDescription.trim(),
+      provider: form.provider.trim(),
+      bookingReference: form.bookingReference.trim(),
       cost: Number(form.cost) || 0,
     });
   };
@@ -69,7 +123,19 @@ export const TransportForm = ({
           <input
             className="input mt-1"
             value={form.from}
-            onChange={(event) => setForm({ ...form, from: event.target.value })}
+            onChange={(event) => {
+              const from = event.target.value;
+              const linked = destinations.find(
+                (destination) => destination.id === form.fromDestinationId
+              );
+              setForm({
+                ...form,
+                from,
+                fromDestinationId: linked?.name === from ? form.fromDestinationId : "",
+              });
+            }}
+            placeholder="Vertrekpunt"
+            autoFocus
           />
         </label>
 
@@ -78,7 +144,18 @@ export const TransportForm = ({
           <input
             className="input mt-1"
             value={form.to}
-            onChange={(event) => setForm({ ...form, to: event.target.value })}
+            onChange={(event) => {
+              const to = event.target.value;
+              const linked = destinations.find(
+                (destination) => destination.id === form.toDestinationId
+              );
+              setForm({
+                ...form,
+                to,
+                toDestinationId: linked?.name === to ? form.toDestinationId : "",
+              });
+            }}
+            placeholder="Aankomstpunt"
           />
         </label>
 
@@ -117,6 +194,7 @@ export const TransportForm = ({
           <input
             className="input mt-1"
             type="date"
+            max={form.arrivalDate || undefined}
             value={form.departureDate}
             onChange={(event) => setForm({ ...form, departureDate: event.target.value })}
           />
@@ -127,8 +205,54 @@ export const TransportForm = ({
           <input
             className="input mt-1"
             type="date"
+            min={form.departureDate || undefined}
             value={form.arrivalDate}
             onChange={(event) => setForm({ ...form, arrivalDate: event.target.value })}
+          />
+        </label>
+
+        <label>
+          <span className="label">Vertrektijd</span>
+          <input
+            className="input mt-1"
+            type="time"
+            value={form.departureTime}
+            onChange={(event) => setForm({ ...form, departureTime: event.target.value })}
+          />
+        </label>
+
+        <label>
+          <span className="label">Aankomsttijd</span>
+          <input
+            className="input mt-1"
+            type="time"
+            min={
+              form.departureDate && form.departureDate === form.arrivalDate
+                ? form.departureTime || undefined
+                : undefined
+            }
+            value={form.arrivalTime}
+            onChange={(event) => setForm({ ...form, arrivalTime: event.target.value })}
+          />
+        </label>
+
+        <label>
+          <span className="label">Vervoerder</span>
+          <input
+            className="input mt-1"
+            value={form.provider}
+            onChange={(event) => setForm({ ...form, provider: event.target.value })}
+            placeholder="Bijv. NS International"
+          />
+        </label>
+
+        <label>
+          <span className="label">Boekingsnummer</span>
+          <input
+            className="input mt-1"
+            value={form.bookingReference}
+            onChange={(event) => setForm({ ...form, bookingReference: event.target.value })}
+            placeholder="Optionele reserveringscode"
           />
         </label>
 
@@ -144,21 +268,33 @@ export const TransportForm = ({
           />
         </label>
 
-        <label>
-          <span className="label">Gekoppelde documenten</span>
-          <select
-            multiple
-            className="input mt-1 min-h-24"
-            value={form.documentIds}
-            onChange={(event) => setForm({ ...form, documentIds: selectedOptions(event.currentTarget) })}
-          >
-            {documents.map((document) => (
-              <option key={document.id} value={document.id}>
-                {document.fileName}
-              </option>
-            ))}
-          </select>
-        </label>
+        <fieldset className="rounded-xl border border-slate-200 bg-white p-3">
+          <legend className="label px-1">Gekoppelde documenten</legend>
+          {documents.length > 0 ? (
+            <div className="mt-1 max-h-32 space-y-2 overflow-y-auto">
+              {documents.map((document) => (
+                <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-700" key={document.id}>
+                  <input
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-mint-700 focus:ring-mint-500"
+                    type="checkbox"
+                    checked={form.documentIds.includes(document.id)}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        documentIds: event.target.checked
+                          ? Array.from(new Set([...current.documentIds, document.id]))
+                          : current.documentIds.filter((id) => id !== document.id),
+                      }))
+                    }
+                  />
+                  <span className="min-w-0 break-words">{document.fileName}</span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-1 text-sm text-slate-500">Nog geen documenten beschikbaar.</p>
+          )}
+        </fieldset>
 
         <label className="md:col-span-2">
           <span className="label">Globale route</span>
@@ -173,6 +309,7 @@ export const TransportForm = ({
           <span className="label">Link naar boeking of planner</span>
           <input
             className="input mt-1"
+            type="url"
             value={form.bookingLink}
             onChange={(event) => setForm({ ...form, bookingLink: event.target.value })}
             placeholder="https://"
@@ -189,7 +326,11 @@ export const TransportForm = ({
         </label>
       </div>
 
-      {error ? <p className="text-sm font-semibold text-rose-700">{error}</p> : null}
+      {error ? (
+        <p className="text-sm font-semibold text-rose-700" role="alert">
+          {error}
+        </p>
+      ) : null}
 
       <div className="flex flex-wrap justify-end gap-2">
         <button className="btn-secondary" type="button" onClick={onCancel}>

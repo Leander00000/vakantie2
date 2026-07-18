@@ -18,12 +18,17 @@ export const DocumentsPage = ({ data, setData }: DocumentsPageProps) => {
 
   const warnings = useMemo(() => {
     const transportWarnings = data.transports
-      .filter((transport) => transport.status === "geboekt" && transport.documentIds.length === 0)
+      .filter(
+        (transport) =>
+          ["geboekt", "betaald"].includes(transport.status) &&
+          transport.documentIds.length === 0 &&
+          !data.documents.some((document) => document.linkedTransportId === transport.id)
+      )
       .map((transport) => `Boeking ${transport.from} naar ${transport.to} heeft nog geen document.`);
     const accommodationWarnings = data.destinations
       .filter(
         (destination) =>
-          destination.accommodationStatus === "geboekt" &&
+          ["geboekt", "betaald"].includes(destination.accommodationStatus) &&
           !data.documents.some((document) => document.linkedDestinationId === destination.id)
       )
       .map((destination) => `Verblijf bij ${destination.name} heeft nog geen document.`);
@@ -56,8 +61,8 @@ export const DocumentsPage = ({ data, setData }: DocumentsPageProps) => {
             Aandachtspunten
           </div>
           <ul className="mt-2 space-y-1 text-sm">
-            {warnings.map((warning) => (
-              <li key={warning}>{warning}</li>
+            {warnings.map((warning, index) => (
+              <li key={`${warning}-${index}`}>{warning}</li>
             ))}
           </ul>
         </div>
