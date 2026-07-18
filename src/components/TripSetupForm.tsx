@@ -1,25 +1,57 @@
 import { useState } from "react";
-import { CalendarPlus } from "lucide-react";
+import { CalendarPlus, Pencil, UserRound } from "lucide-react";
 import { currencies, type TripSetupInput } from "../types";
 
 interface TripSetupFormProps {
   onCreate: (input: TripSetupInput) => void;
+  initial?: TripSetupInput;
+  mode?: "create" | "edit";
+  onCancel?: () => void;
 }
 
-export const TripSetupForm = ({ onCreate }: TripSetupFormProps) => {
-  const [form, setForm] = useState<TripSetupInput>({
+const emptyForm: TripSetupInput = {
     name: "",
     startDate: "",
     endDate: "",
     travelers: 1,
+    travelerNames: [""],
     currency: "EUR",
     totalBudget: undefined,
     notes: "",
-  });
+};
+
+export const TripSetupForm = ({
+  onCreate,
+  initial,
+  mode = "create",
+  onCancel,
+}: TripSetupFormProps) => {
+  const [form, setForm] = useState<TripSetupInput>(initial ?? emptyForm);
   const [error, setError] = useState("");
 
   const update = <K extends keyof TripSetupInput>(key: K, value: TripSetupInput[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const updateTravelerCount = (travelers: number) => {
+    const count = Math.max(1, Math.min(20, travelers || 1));
+    setForm((current) => ({
+      ...current,
+      travelers: count,
+      travelerNames: Array.from(
+        { length: count },
+        (_, index) => current.travelerNames[index] ?? ""
+      ),
+    }));
+  };
+
+  const updateTravelerName = (index: number, name: string) => {
+    setForm((current) => ({
+      ...current,
+      travelerNames: current.travelerNames.map((value, itemIndex) =>
+        itemIndex === index ? name : value
+      ),
+    }));
   };
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -36,22 +68,38 @@ export const TripSetupForm = ({ onCreate }: TripSetupFormProps) => {
       setError("De einddatum moet op of na de startdatum liggen.");
       return;
     }
+    const travelerCount = Math.max(1, Math.min(20, form.travelers || 1));
+    const travelerNames = Array.from(
+      { length: travelerCount },
+      (_, index) => form.travelerNames[index]?.trim() || `Reiziger ${index + 1}`
+    );
+    const normalizedNames = travelerNames.map((name) => name.toLocaleLowerCase("nl-NL"));
+    if (new Set(normalizedNames).size !== normalizedNames.length) {
+      setError("Geef iedere reiziger een unieke naam voor een correcte kostenverdeling.");
+      return;
+    }
     setError("");
-    onCreate(form);
+    onCreate({ ...form, travelers: travelerCount, travelerNames });
   };
 
   return (
-    <section className="mx-auto max-w-3xl">
+    <section className={mode === "create" ? "mx-auto max-w-3xl" : "mx-auto max-w-4xl"}>
       <div className="panel">
         <div className="flex items-start gap-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-mint-100 text-mint-800">
-            <CalendarPlus size={24} />
+            {mode === "create" ? <CalendarPlus size={24} /> : <Pencil size={22} />}
           </div>
           <div>
-            <p className="text-sm font-semibold text-mint-700">Eerste stap</p>
-            <h2 className="mt-1 text-2xl font-bold text-slate-950">Nieuwe reis aanmaken</h2>
+            <p className="text-sm font-semibold text-mint-700">
+              {mode === "create" ? "Eerste stap" : "Reisinstellingen"}
+            </p>
+            <h2 className="mt-1 text-2xl font-bold text-slate-950">
+              {mode === "create" ? "Nieuwe reis aanmaken" : "Reisgegevens bewerken"}
+            </h2>
             <p className="mt-2 text-sm text-slate-500">
-              Start met de basis. Bestemmingen, vervoer, kosten, paklijstitems en documenten voeg je daarna zelf toe.
+              {mode === "create"
+                ? "Start met de basis. Bestemmingen, vervoer, kosten, paklijstitems en documenten voeg je daarna zelf toe."
+                : "Een gewijzigde datumrange past de lege reisdagen automatisch aan. Ingevulde dagen binnen de nieuwe periode blijven bewaard."}
             </p>
           </div>
         </div>
@@ -92,11 +140,38 @@ export const TripSetupForm = ({ onCreate }: TripSetupFormProps) => {
             <input
               className="input mt-1"
               min={1}
+              max={20}
               type="number"
               value={form.travelers}
-              onChange={(event) => update("travelers", Number(event.target.value))}
+              onChange={(event) => updateTravelerCount(Number(event.target.value))}
             />
           </label>
+
+          <fieldset className="rounded-xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+            <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Namen reizigers
+            </legend>
+            <p className="mb-3 text-sm text-slate-500">
+              Optioneel, maar handig voor de kostenverdeling en paklijst.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {form.travelerNames.map((name, index) => (
+                <label className="relative" key={index}>
+                  <span className="sr-only">Naam reiziger {index + 1}</span>
+                  <UserRound
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    size={16}
+                  />
+                  <input
+                    className="input pl-9"
+                    value={name}
+                    onChange={(event) => updateTravelerName(index, event.target.value)}
+                    placeholder={`Reiziger ${index + 1}`}
+                  />
+                </label>
+              ))}
+            </div>
+          </fieldset>
 
           <label>
             <span className="label">Valuta</span>
@@ -138,11 +213,20 @@ export const TripSetupForm = ({ onCreate }: TripSetupFormProps) => {
             />
           </label>
 
-          {error ? <p className="text-sm font-semibold text-rose-700 sm:col-span-2">{error}</p> : null}
+          {error ? (
+            <p className="text-sm font-semibold text-rose-700 sm:col-span-2" role="alert">
+              {error}
+            </p>
+          ) : null}
 
-          <div className="flex justify-end sm:col-span-2">
+          <div className="flex flex-wrap justify-end gap-2 sm:col-span-2">
+            {mode === "edit" && onCancel ? (
+              <button className="btn-secondary" type="button" onClick={onCancel}>
+                Annuleren
+              </button>
+            ) : null}
             <button className="btn-primary" type="submit">
-              Reis aanmaken
+              {mode === "create" ? "Reis aanmaken" : "Wijzigingen opslaan"}
             </button>
           </div>
         </form>

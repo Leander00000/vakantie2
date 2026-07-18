@@ -10,6 +10,7 @@ import {
   type DayType,
 } from "../../types";
 import { formatDate, formatMoney } from "../../data/emptyTrip";
+import { ChecklistPicker } from "../ChecklistPicker";
 
 interface DayFormProps {
   data: AppData;
@@ -17,9 +18,6 @@ interface DayFormProps {
   onSubmit: (day: DayPlan) => void;
   onCancel: () => void;
 }
-
-const selectedOptions = (select: HTMLSelectElement) =>
-  Array.from(select.selectedOptions).map((option) => option.value);
 
 export const DayForm = ({ data, day, onSubmit, onCancel }: DayFormProps) => {
   const [form, setForm] = useState<DayPlan>(day);
@@ -114,53 +112,51 @@ export const DayForm = ({ data, day, onSubmit, onCancel }: DayFormProps) => {
           </select>
         </label>
 
-        <label>
-          <span className="label">Vervoer koppelen</span>
-          <select
-            multiple
-            className="input mt-1 min-h-28"
-            value={form.transportIds}
-            onChange={(event) => setForm({ ...form, transportIds: selectedOptions(event.currentTarget) })}
-          >
-            {data.transports.map((transport) => (
-              <option key={transport.id} value={transport.id}>
-                {transport.from} - {transport.to} ({transport.mode})
-              </option>
-            ))}
-          </select>
-        </label>
+        <ChecklistPicker
+          legend="Vervoer koppelen"
+          options={data.transports.map((transport) => ({
+            value: transport.id,
+            label: `${transport.from} → ${transport.to}`,
+            detail: transport.mode,
+          }))}
+          value={form.transportIds}
+          onChange={(transportIds) => setForm((current) => ({ ...current, transportIds }))}
+        />
 
-        <label>
-          <span className="label">Documenten koppelen</span>
-          <select
-            multiple
-            className="input mt-1 min-h-28"
-            value={form.documentIds}
-            onChange={(event) => setForm({ ...form, documentIds: selectedOptions(event.currentTarget) })}
-          >
-            {data.documents.map((document) => (
-              <option key={document.id} value={document.id}>
-                {document.fileName}
-              </option>
-            ))}
-          </select>
-        </label>
+        <ChecklistPicker
+          legend="Ideeën koppelen"
+          options={data.activities.map((activity) => ({
+            value: activity.id,
+            label: activity.title,
+            detail: activity.location || activity.category,
+          }))}
+          value={form.activityIds}
+          onChange={(activityIds) => setForm((current) => ({ ...current, activityIds }))}
+        />
 
-        <label>
-          <span className="label">Budgetposten koppelen</span>
-          <select
-            multiple
-            className="input mt-1 min-h-28"
-            value={form.expenseIds}
-            onChange={(event) => setForm({ ...form, expenseIds: selectedOptions(event.currentTarget) })}
-          >
-            {data.expenses.map((expense) => (
-              <option key={expense.id} value={expense.id}>
-                {expense.title} - {formatMoney(expense.amount, expense.currency)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <ChecklistPicker
+          legend="Documenten koppelen"
+          options={data.documents.map((document) => ({
+            value: document.id,
+            label: document.fileName,
+            detail: document.documentType,
+          }))}
+          value={form.documentIds}
+          onChange={(documentIds) => setForm((current) => ({ ...current, documentIds }))}
+          hint="Een document kan aan één dag tegelijk zijn gekoppeld. Een nieuwe keuze verplaatst de koppeling."
+        />
+
+        <ChecklistPicker
+          legend="Budgetposten koppelen"
+          options={data.expenses.map((expense) => ({
+            value: expense.id,
+            label: expense.title,
+            detail: formatMoney(expense.amount, expense.currency),
+          }))}
+          value={form.expenseIds}
+          onChange={(expenseIds) => setForm((current) => ({ ...current, expenseIds }))}
+          hint="Een budgetpost kan aan één dag tegelijk zijn gekoppeld. Een nieuwe keuze verplaatst de koppeling."
+        />
 
         <label>
           <span className="label">Kostenindicatie</span>

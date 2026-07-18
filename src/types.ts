@@ -51,6 +51,17 @@ export type DocumentType =
   | "Reservering"
   | "Overig";
 
+export type ActivityCategory =
+  | "Natuur"
+  | "Wandeling"
+  | "Bezienswaardigheid"
+  | "Eten & drinken"
+  | "Cultuur"
+  | "Ontspanning"
+  | "Overig";
+export type ActivityPriority = "misschien" | "graag" | "must-do";
+export type ActivityStatus = "idee" | "shortlist" | "gepland" | "geboekt";
+
 export type TabKey = "planner" | "budget" | "packing" | "documents";
 
 export interface Trip {
@@ -59,6 +70,7 @@ export interface Trip {
   startDate: string;
   endDate: string;
   travelers: number;
+  travelerNames: string[];
   currency: string;
   totalBudget?: number;
   notes: string;
@@ -75,6 +87,11 @@ export interface Destination {
   transportStatus: StayStatus;
   accommodationLink: string;
   transportLink: string;
+  accommodationName: string;
+  accommodationAddress: string;
+  accommodationReference: string;
+  checkInTime: string;
+  checkOutTime: string;
   notes: string;
 }
 
@@ -85,6 +102,7 @@ export interface DayPlan {
   location: string;
   dayType: DayType;
   transportIds: string[];
+  activityIds: string[];
   accommodation: string;
   activities: string;
   meals: string;
@@ -100,10 +118,16 @@ export interface Transport {
   id: string;
   from: string;
   to: string;
+  fromDestinationId: string;
+  toDestinationId: string;
   mode: TransportMode;
   routeDescription: string;
   departureDate: string;
   arrivalDate: string;
+  departureTime: string;
+  arrivalTime: string;
+  provider: string;
+  bookingReference: string;
   status: TransportStatus;
   cost: number;
   bookingLink: string;
@@ -120,6 +144,7 @@ export interface Expense {
   paidStatus: PaidStatus;
   paidBy: string;
   split: boolean;
+  splitBetween: string[];
   dayId: string;
   destinationId: string;
   documentIds: string[];
@@ -139,6 +164,20 @@ export interface PackingItem {
   quantity: number;
   packed: boolean;
   essential: boolean;
+  assignedTo: string[];
+  notes: string;
+}
+
+export interface ActivityIdea {
+  id: string;
+  title: string;
+  destinationId: string;
+  location: string;
+  category: ActivityCategory;
+  priority: ActivityPriority;
+  status: ActivityStatus;
+  estimatedCost: number;
+  bookingLink: string;
   notes: string;
 }
 
@@ -150,9 +189,11 @@ export interface TravelDocument {
   linkedDayId: string;
   linkedDestinationId: string;
   linkedExpenseId: string;
+  linkedTransportId: string;
   uploadedAt: string;
   notes: string;
   fileBlobKey: string;
+  size: number;
 }
 
 export interface AppData {
@@ -161,6 +202,8 @@ export interface AppData {
   transports: Transport[];
   dayPlans: DayPlan[];
   expenses: Expense[];
+  activities: ActivityIdea[];
+  categoryBudgets: Partial<Record<ExpenseCategory, number>>;
   packingCategories: PackingCategory[];
   packingItems: PackingItem[];
   documents: TravelDocument[];
@@ -171,6 +214,7 @@ export interface TripSetupInput {
   startDate: string;
   endDate: string;
   travelers: number;
+  travelerNames: string[];
   currency: string;
   totalBudget?: number;
   notes: string;
@@ -251,5 +295,18 @@ export const documentTypes: DocumentType[] = [
   "Reservering",
   "Overig",
 ];
+
+export const activityCategories: ActivityCategory[] = [
+  "Natuur",
+  "Wandeling",
+  "Bezienswaardigheid",
+  "Eten & drinken",
+  "Cultuur",
+  "Ontspanning",
+  "Overig",
+];
+
+export const activityPriorities: ActivityPriority[] = ["misschien", "graag", "must-do"];
+export const activityStatuses: ActivityStatus[] = ["idee", "shortlist", "gepland", "geboekt"];
 
 export const currencies = ["EUR", "USD", "GBP", "CHF", "NOK", "SEK", "DKK"];

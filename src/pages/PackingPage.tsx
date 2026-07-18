@@ -23,6 +23,8 @@ export const PackingPage = ({ data, setData }: PackingPageProps) => {
 
   const selectedCategory = data.packingCategories.find((category) => category.id === selectedCategoryId) ?? null;
   const packedCount = data.packingItems.filter((item) => item.packed).length;
+  const openEssentialCount = data.packingItems.filter((item) => item.essential && !item.packed).length;
+  const sharedCount = data.packingItems.filter((item) => (item.assignedTo ?? []).length === 0).length;
   const totalProgress = data.packingItems.length
     ? Math.round((packedCount / data.packingItems.length) * 100)
     : 0;
@@ -70,12 +72,27 @@ export const PackingPage = ({ data, setData }: PackingPageProps) => {
 
   return (
     <section className="space-y-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-950">Paklijst</h2>
-          <p className="text-sm text-slate-500">Categorieën staan klaar, maar er zijn geen verplichte items.</p>
+      <div>
+        <h2 className="text-2xl font-bold text-slate-950">Paklijst</h2>
+        <p className="text-sm text-slate-500">
+          Bouw zelf je lijst op, wijs items toe en voeg desgewenst meerdere regels tegelijk toe.
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="panel py-4">
+          <span className="text-sm font-semibold text-slate-500">Totaal items</span>
+          <p className="mt-1 text-2xl font-bold text-slate-950">{data.packingItems.length}</p>
         </div>
-        <div className="min-w-64 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="panel py-4">
+          <span className="text-sm font-semibold text-slate-500">Ingepakt</span>
+          <p className="mt-1 text-2xl font-bold text-emerald-700">{packedCount}</p>
+        </div>
+        <div className="panel py-4">
+          <span className="text-sm font-semibold text-slate-500">Essentieel open</span>
+          <p className="mt-1 text-2xl font-bold text-amber-700">{openEssentialCount}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <span className="text-sm font-semibold text-slate-600">Totale voortgang</span>
             <span className="text-lg font-bold text-slate-950">{totalProgress}%</span>
@@ -83,6 +100,14 @@ export const PackingPage = ({ data, setData }: PackingPageProps) => {
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
             <div className="h-full rounded-full bg-mint-500" style={{ width: `${totalProgress}%` }} />
           </div>
+          <p className="mt-2 text-xs text-slate-500">{sharedCount} gezamenlijk of niet toegewezen</p>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h3 className="text-lg font-bold text-slate-950">Categorieën</h3>
+          <p className="text-sm text-slate-500">Selecteer een categorie om de items te bekijken.</p>
         </div>
       </div>
 
@@ -120,7 +145,12 @@ export const PackingPage = ({ data, setData }: PackingPageProps) => {
           </div>
         </aside>
 
-        <PackingItemList data={data} selectedCategory={selectedCategory} setData={setData} />
+        <PackingItemList
+          data={data}
+          key={selectedCategory?.id ?? "no-packing-category"}
+          selectedCategory={selectedCategory}
+          setData={setData}
+        />
       </div>
     </section>
   );

@@ -53,7 +53,12 @@ export const PackingCategoryCard = ({
         </form>
       ) : (
         <>
-          <button className="w-full text-left" type="button" onClick={onSelect}>
+          <button
+            aria-pressed={selected}
+            className="w-full text-left"
+            type="button"
+            onClick={onSelect}
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="font-bold text-slate-950">{category.name}</h3>

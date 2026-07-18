@@ -1,44 +1,49 @@
 # Reisplanner
 
-Een lokale React/Vite reisplanner met Nederlandse interface. De app start zonder vooraf ingevulde reis, bestemmingen, activiteiten, kosten, documenten of paklijstitems. Na het aanmaken van een reis worden alleen lege reisdagen gegenereerd op basis van de gekozen start- en einddatum.
+Een privacyvriendelijke reisplanner in React, TypeScript en Vite. De app start leeg: je vult zelf de reis, bestemmingen, activiteiten, kosten, documenten en paklijst in.
+
+## Wat je kunt plannen
+
+- Planner met reisoverzicht, route, dagplanning en losse activiteitenideeën
+- Bestemmingen, accommodaties en vervoersverbindingen met boekingsstatussen
+- Budgetten per categorie, betaalstatus en verdeling tussen reizigers
+- Paklijst per categorie en reiziger, inclusief bulk toevoegen en voortgang
+- Lokale documentopslag met koppelingen aan dagen, bestemmingen, vervoer en uitgaven
+- Volledige back-up en herstel via JSON-export en -import
+- Responsive bediening op desktop, tablet en mobiel
 
 ## Installatie
 
-```bash
-npm install
-```
-
-## Starten
+Gebruik Node.js 20 of nieuwer en pnpm:
 
 ```bash
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 Open daarna de lokale Vite-url die in de terminal verschijnt.
 
-Voor een productiebuild:
+## Controles en productiebuild
 
 ```bash
-npm run build
+pnpm typecheck
+pnpm build
+pnpm preview
 ```
+
+Vite schrijft de productieversie naar `dist`. De meegeleverde `vercel.json` laat directe en vernieuwde SPA-routes correct terugvallen op `index.html`.
 
 ## Waar data wordt opgeslagen
 
-- Reisgegevens, bestemmingen, dagplanning, vervoer, budgetposten, paklijstcategorieën, paklijstitems en documentmetadata worden opgeslagen in `localStorage`.
-- Geüploade documentbestanden worden lokaal opgeslagen in IndexedDB, database `reisplanner-documenten`.
-- Er is geen backend, authenticatie, externe API of kaartenintegratie.
+- Reisgegevens en documentmetadata staan lokaal in `localStorage`.
+- Geüploade bestanden staan lokaal in IndexedDB, database `reisplanner-documenten`.
+- Er is geen backend, account of externe gegevensdienst. Data blijft dus in de gebruikte browser en op het gebruikte apparaat.
+- Een andere browser of een ander apparaat ziet de reis pas nadat daar een JSON-back-up is geïmporteerd.
 
-## Export/import
+## Export en import
 
-Gebruik `Export JSON` om de huidige reisdata te downloaden. De export bevat ook geüploade documentbestanden als ingesloten data in hetzelfde JSON-bestand.
-
-Gebruik `Import JSON` om een eerdere export terug te zetten. Bij import vraagt de app eerst om bevestiging, omdat bestaande lokale data en documentbestanden worden vervangen.
+Gebruik **Back-up downloaden** om alle reisgegevens én geüploade bestanden in één JSON-bestand te bewaren. Met **Back-up importeren** zet je die gegevens terug. De app vraagt eerst om bevestiging voordat bestaande lokale data wordt vervangen.
 
 ## Lege startstaat
 
-Bij eerste gebruik toont de app `Nieuwe reis aanmaken`. Daarna kun je zelf onderdelen toevoegen via:
-
-- Planner: bestemmingen, vervoer en dag-tot-dag planning
-- Budget: uitgaven, filters, categorieën en budgetoverzicht
-- Paklijst: categorieën en items
-- Documenten: uploads, metadata, koppelingen, zoeken en filters
+Bij eerste gebruik toont de app **Nieuwe reis aanmaken**. Alleen de dagregels worden op basis van de gekozen start- en einddatum gegenereerd; de inhoud blijft leeg en volledig door de gebruiker invulbaar.

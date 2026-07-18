@@ -20,20 +20,55 @@ export const ExpenseList = ({ data, setData, filteredExpenses }: ExpenseListProp
   const upsertExpense = (expense: Expense) => {
     setData((current) => {
       const exists = current.expenses.some((item) => item.id === expense.id);
+      const validDocumentIds = new Set(current.documents.map((document) => document.id));
+      const documentIds = Array.from(
+        new Set(expense.documentIds.filter((documentId) => validDocumentIds.has(documentId)))
+      );
+      const selectedDocumentIds = new Set(documentIds);
+      const normalizedExpense: Expense = {
+        ...expense,
+        currency: current.trip?.currency ?? expense.currency,
+        dayId: current.dayPlans.some((day) => day.id === expense.dayId) ? expense.dayId : "",
+        destinationId: current.destinations.some(
+          (destination) => destination.id === expense.destinationId
+        )
+          ? expense.destinationId
+          : "",
+        documentIds,
+      };
       return {
         ...current,
         expenses: exists
-          ? current.expenses.map((item) => (item.id === expense.id ? expense : item))
-          : [...current.expenses, expense],
+          ? current.expenses.map((item) =>
+              item.id === expense.id
+                ? normalizedExpense
+                : {
+                    ...item,
+                    documentIds: item.documentIds.filter(
+                      (documentId) => !selectedDocumentIds.has(documentId)
+                    ),
+                  }
+            )
+          : [
+              ...current.expenses.map((item) => ({
+                ...item,
+                documentIds: item.documentIds.filter(
+                  (documentId) => !selectedDocumentIds.has(documentId)
+                ),
+              })),
+              normalizedExpense,
+            ],
         dayPlans: current.dayPlans.map((day) => ({
           ...day,
           expenseIds:
-            day.id === expense.dayId
+            day.id === normalizedExpense.dayId
               ? Array.from(new Set([...day.expenseIds, expense.id]))
               : day.expenseIds.filter((expenseId) => expenseId !== expense.id),
         })),
         documents: current.documents.map((document) => {
-          if (expense.documentIds.includes(document.id)) return { ...document, linkedExpenseId: expense.id };
+          if (selectedDocumentIds.has(document.id)) {
+            return { ...document, linkedExpenseId: expense.id };
+          }
           if (document.linkedExpenseId === expense.id) return { ...document, linkedExpenseId: "" };
           return document;
         }),
@@ -82,6 +117,7 @@ export const ExpenseList = ({ data, setData, filteredExpenses }: ExpenseListProp
         <ExpenseForm
           data={data}
           initial={editingExpense}
+          key={editingExpense?.id ?? "new-expense"}
           onCancel={() => {
             setShowForm(false);
             setEditingExpense(undefined);
@@ -103,15 +139,15 @@ export const ExpenseList = ({ data, setData, filteredExpenses }: ExpenseListProp
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-soft">
-          <table className="min-w-[920px] w-full text-left text-sm">
+          <table className="w-full min-w-[1100px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-4 py-3">Titel</th>
                 <th className="px-4 py-3">Categorie</th>
                 <th className="px-4 py-3">Bedrag</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Dag</th>
-                <th className="px-4 py-3">Bestemming</th>
+                <th className="px-4 py-3">Betaling</th>
+                <th className="px-4 py-3">Verdeling</th>
+                <th className="px-4 py-3">Gekoppeld aan</th>
                 <th className="px-4 py-3">Documenten</th>
                 <th className="px-4 py-3">Acties</th>
               </tr>
@@ -127,13 +163,23 @@ export const ExpenseList = ({ data, setData, filteredExpenses }: ExpenseListProp
                     <td className="px-4 py-3 font-semibold text-slate-900">
                       {formatMoney(expense.amount, expense.currency)}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 align-top">
                       <StatusBadge status={expense.paidStatus === "betaald" ? "betaald" : "openstaand"} />
+                      <p className="mt-1 text-xs text-slate-500">
+                        {expense.paidBy ? `Door ${expense.paidBy}` : "Betaler niet toegewezen"}
+                      </p>
                     </td>
                     <td className="px-4 py-3 text-slate-600">
-                      {day ? `Dag ${day.dayNumber} · ${formatDate(day.date)}` : "-"}
+                      {expense.splitBetween?.length
+                        ? expense.splitBetween.join(", ")
+                        : "Niet toegewezen"}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{destination?.name ?? "-"}</td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {day ? `Dag ${day.dayNumber} · ${formatDate(day.date)}` : "Geen dag"}
+                      <span className="block text-xs text-slate-400">
+                        {destination?.name ?? "Geen bestemming"}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-slate-600">{expense.documentIds.length}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">

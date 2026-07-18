@@ -25,6 +25,8 @@ export const createEmptyData = (): AppData => ({
   transports: [],
   dayPlans: [],
   expenses: [],
+  activities: [],
+  categoryBudgets: {},
   packingCategories: [],
   packingItems: [],
   documents: [],
@@ -35,7 +37,10 @@ export const createTrip = (input: TripSetupInput): Trip => ({
   name: input.name.trim(),
   startDate: input.startDate,
   endDate: input.endDate,
-  travelers: Math.max(1, input.travelers || 1),
+  travelers: Math.max(1, Math.min(20, input.travelers || 1)),
+  travelerNames: Array.from({ length: Math.max(1, Math.min(20, input.travelers || 1)) }, (_, index) =>
+    input.travelerNames[index]?.trim() || `Reiziger ${index + 1}`
+  ),
   currency: input.currency || "EUR",
   totalBudget: input.totalBudget,
   notes: input.notes.trim(),
@@ -85,6 +90,7 @@ export const createEmptyDay = (date: string, dayNumber: number): DayPlan => ({
   location: "",
   dayType: "",
   transportIds: [],
+  activityIds: [],
   accommodation: "",
   activities: "",
   meals: "",
